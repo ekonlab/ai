@@ -117,6 +117,70 @@ knn.pred=knn(Xlag[train,],Xlag[!train,],Direction[train],k=1)
 table(knn.pred,Direction[!train])
 mean(knn.pred==Direction[!train])
 
+# Chapter 5: Resampling Methods
+
+# Cross-Validation
+require(ISLR)
+require(boot)
+?cv.glm
+plot(mpg~horsepower,data=Auto)
+
+# LOOCV
+glm.fit = glm(mpg~horsepower,data=Auto)
+summary(glm.fit)
+cv.glm(Auto,glm.fit)$delta
+
+# write a function to use a formula
+loocv = function(fit){
+  h=lm.influence(fit)$h
+  mean((residuals(fit)/(1-h))^2)
+}
+
+loocv(glm.fit)
+
+cv.error=rep(0.5)
+degree=1:5
+for(d in degree){
+  glm.fit=glm(mpg~poly(horsepower,d),data=Auto)
+  cv.error[d]=loocv(glm.fit)
+}
+
+plot(degree,cv.error,type="b")
+
+# 10-fold CV
+cv.error10=rep(0.5)
+for(d in degree){
+  glm.fit=glm(mpg~poly(horsepower,d),data=Auto)
+  cv.error10[d]=cv.glm(Auto,glm.fit,K=10)$delta[1]
+}
+
+lines(degree,cv.error10,type="b",col="red")
+
+# Bootstrap
+# minimum risk investment x and y investments
+alpha = function(x,y){
+  vx=var(x)
+  vy=var(y)
+  cxy=cov(x,y)
+  (vy-cxy)/(vx+vy-2*cxy)
+}
+
+alpha(Portfolio$X,Portfolio$Y)
+
+# What is the standard error of alpha?
+alpha.fn = function(data,index){
+  with(data[index,],alpha(X,Y))
+}
+
+alpha.fn(Portfolio,sample(1:100,100,replace=TRUE))
+
+boot.out=boot(Portfolio,alpha.fn,R=1000)
+boot.out
+plot(boot.out)
+
+
+
+
 
 
 
