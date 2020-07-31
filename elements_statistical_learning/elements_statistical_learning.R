@@ -247,5 +247,42 @@ plot(gam2)
 gam2a = gam(I(wage>250)~s(age,df=4)+year+education,data=Wage,family=binomial)
 anova(gam2a,gam2,test="Chisq")
 
+# Chapter 8: Tree based Methods
+
+require(ISLR)
+require(tree)
+attach(Carseats)
+
+hist(Sales)
+High = ifelse(Sales<=8,"No","Yes")
+Carseats=data.frame(Carseats,High)
+Carseats$High = as.factor(Carseats$High)
+
+tree.carseats=tree(High~.-Sales,data=Carseats)
+summary(tree.carseats)
+plot(tree.carseats)
+text(tree.carseats,pretty=0)
+
+set.seed(1011)
+train =sample(1:nrow(Carseats),250)
+tree.carseats=tree(High~.-Sales,Carseats,subset=train)
+plot(tree.carseats)
+text(tree.carseats,pretty=0)
+tree.pred=predict(tree.carseats,Carseats[-train,],type="class")
+with(Carseats[-train,],table(tree.pred,High))
+(72+33)/150
+
+# Using cross validation to prune the tree
+cv.carseats=cv.tree(tree.carseats,FUN=prune.misclass)
+cv.carseats
+plot(cv.carseats)
+prune.carseats=prune.misclass(tree.carseats,best=13)
+plot(prune.carseats)
+text(prune.carseats,pretty=0)
+
+# evaluate this pruned tree
+tree.pred=predict(prune.carseats,Carseats[-train,],type="class")
+with(Carseats[-train,],table(tree.pred,High))
+(72+32)/150
 
 
