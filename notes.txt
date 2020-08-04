@@ -1,4 +1,5 @@
 repo general notes here;
 
-firefox flow: goodnotes -> drive -> notebook or notion
+firefox flow: goodnotes -> drive -> notebook or notion -> github
+
 
