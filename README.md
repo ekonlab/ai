@@ -1,4 +1,4 @@
 # ML
 ML 2020
-  - Elements of statistical Learning
+  - Elements of Statistical Learning
   - Salazar
