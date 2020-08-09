@@ -1,0 +1,16 @@
+https://juliahub.com/ui/Home
+
+init julia repl with control+p and >julia repl
+
+in julia terminal:
+
+] to open package manager
+
+add nameofpackage
+status to check packages installed
+delete to escape pkg
+
+using nameofpackage to load a package in terminal
+exit() to stop terminal
+
+
