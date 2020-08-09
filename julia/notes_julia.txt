@@ -13,4 +13,9 @@ delete to escape pkg
 using nameofpackage to load a package in terminal
 exit() to stop terminal
 
+control+c to stop jupyter terminal
+
+    
+
+
 
