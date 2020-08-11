@@ -15,6 +15,10 @@ exit() to stop terminal
 
 control+c to stop jupyter terminal
 
+
+open julia app first and then anaconda to open jupyter.....
+
+
     
 
 
