@@ -18,8 +18,13 @@ control+c to stop jupyter terminal
 
 open julia app first and then anaconda to open jupyter.....
 
+Signals: Hit when we scan our surroundings evidence of the future happening today. A signal is often a recent small or local innovation with the potential to affect other locales or topics.
+Trends are patterns that observable in society today, that reflect directional change and that are ideally measurable.
+Drivers are a cluster of related trends that is driving on shaping change. Drivers are the underlying factors in the present that shape the future with deep roots in historical patterns of change. 
+Projections are public predictions of specific change that might influence what people expect to happen. They can relate to anything- markets, population, climate… They are typically quantitative.
 
     
 
 
+ 
 
