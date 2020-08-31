@@ -1,0 +1,164 @@
+{
+ "metadata": {
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.7.7-final"
+  },
+  "orig_nbformat": 2,
+  "kernelspec": {
+   "name": "python3",
+   "display_name": "Python 3"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2,
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Notes on tribulations"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "nutshell, data\n",
+    "science can be understood as the extraction of knowledge\n",
+    "and insight from various sources of data, and the skills Data science skills range from\n",
+    "programming to design, and from\n",
+    "mathematics to storytelling. required to achieve this range from programming to design,\n",
+    "and from mathematics to storytelling."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Typical examples of data science products are better Some examples of data science\n",
+    "outputs make it easier to clarify\n",
+    "what the discipline does. This list\n",
+    "is by no means exhaustive.\n",
+    "\n",
+    "explained by the questions they aim to answer; these\n",
+    "questions are the drivers to the acquisition and selection of\n",
+    "the appropriate data to be interrogated in order to provide\n",
+    "insight into an area of interest."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "What product will sell better in conjunction with another Market basket analysis\n",
+    "popular product?\n",
+    "Who will be declared Prime Minister in the next general election? . Predictive analytics\n",
+    "How can customers be encouraged to spend a longer E-commerce\n",
+    "time in an online portal?\n",
+    "Are there any discernible patterns that allow us to\n",
+    "\n",
+    "Clustering analysis and market\n",
+    "segmentation\n",
+    "What advertisement should be placed on what site?\n",
+    "Given the interests of a customer, what other products Recommendation systems\n",
+    "can be recommended to them?\n",
+    "• What are the latest developments and breakout reports in Social media analysis\n",
+    "newspapers and social media that may affect the industry\n",
+    "of interest?\n",
+    "• Given someone’s interests and hobbies, who may be Online services\n",
+    "suitable potential partners?\n",
+    "• How can we keep potentially sensitive information Cybersecurity\n",
+    "protected and react proactively to information we store?\n",
+    "• How can we distinguish valid, relevant documents such Classification analysis\n",
+    "as emails (ham), from invalid, irrelevant ones (spam)?\n",
+    "• How to determine if a retail transaction is valid or not? Fraud prevention\n",
+    "• What is the demand for a particular service at a Demand forecasting\n",
+    "particular time or place?\n",
+    "\n",
+    "These are not questions that decision-makers,\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "One important thing to bear in mind about the outputs of\n",
+    "data science and analytics is that in the vast majority of\n",
+    "cases they do not uncover hidden patterns or relationships\n",
+    "as if by magic, and in the case of predictive analytics they Predictive analytics do not tell us\n",
+    "the future; instead they allow us to\n",
+    "\n",
+    "forecast. do not tell us exactly what will happen in the future.\n",
+    "Instead, they enable us to forecast what may come. In other\n",
+    "words, once we have carried out some modelling there is\n",
+    "still a lot of work to do to make sense out of the results\n",
+    "obtained, taking into account the constraints and\n",
+    "assumptions in the model, as well as considering what an\n",
+    "acceptable level of reliability is in each scenario."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "a data scientist role goes beyond the collection\n",
+    "and reporting on data; it must involve looking at a business The role of a data scientist\n",
+    "goes beyond the collection and\n",
+    "reporting on data. application or process from multiple vantage points and\n",
+    "determining what the main questions and follow-ups are, as\n",
+    "well as recommending the most appropriate ways to employ\n",
+    "the data at hand."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "In terms of characteristics, a data scientist has an inquisitive\n",
+    "mind and is prepared to explore and ask questions, examine\n",
+    "assumptions and analyse processes, test hypotheses and Not only does a data scientist\n",
+    "need an inquisitive mind, but also\n",
+    "good communication skills. try out solutions and, based on evidence, communicate\n",
+    "informed conclusions, recommendations and caveats to\n",
+    "stakeholders and decision makers."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Having a person that is able and experienced in managing\n",
+    "technical teams is an important role to have in the mix. The\n",
+    "main idea is to cover the fact that many a data scientist\n",
+    "is far more interested in tackling questions and problems\n",
+    "head on, rather than dealing with managing a project from\n",
+    "end to end. One way to help them deliver is to have a\n",
+    "knowledgeable individual that is able, on the one hand, First, a Data Science Project\n",
+    "Manager is needed. to keep track of how projects are going, attend meetings\n",
+    "and manage relationships. On the other hand, they should\n",
+    "have a general understanding of techniques, algorithms and\n",
+    "technology to be able to liaise with the team effectively. The\n",
+    "project manager does not have to be a ninja programmer,\n",
+    "but should be able to understand what the rest of the team\n",
+    "are working on and the challenges they may be facing."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ]
+}
