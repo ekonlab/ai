@@ -23,7 +23,10 @@ Trends are patterns that observable in society today, that reflect directional c
 Drivers are a cluster of related trends that is driving on shaping change. Drivers are the underlying factors in the present that shape the future with deep roots in historical patterns of change. 
 Projections are public predictions of specific change that might influence what people expect to happen. They can relate to anything- markets, population, climate… They are typically quantitative.
 
-    
+
+https://github.com/JuliaAcademy/DataScience
+
+
 
 
  
