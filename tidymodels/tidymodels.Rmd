@@ -1,0 +1,89 @@
+---
+title: "Tidymodels"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Introduction
+
+Tidymodels: <https://www.tmwr.org/>.
+
+Models are mathematical tools that can describe a system and capture relationships in the data given to them. The utility of a model hinges on its ability to be reductive.
+
+### 1.1. Types of models
+
+#### Descriptive models
+
+The purpose of a descriptive model is to describe or illustrate characteristics of some data. The analysis might have no other purpose than to visually emphasize some trend or artifact in the data. An example can be a LOESS (locally estimated smoothing model) model, that consists on a smooth and flexible regression model. This model is used to discover potential ways to represent a variable.
+
+#### Inferential models
+
+The goal of an inferential model is to produce a decision for a research question or to test a specific hypothesis. It aims to make some statement of truth regarding a predefined conjecture or idea. In many cases, a qualitative statement is produced (e.g, a difference was "statistically significant").
+
+For example, in a clinical trial, the goal might be to provide confirmation that a new therapy does a better job in prolonging life than an alternative, like an existing therapy or no treatment. If the clinical endpoint was related to survival of a patient, the null hypothesis might be that the two therapeutic groups have equal median survival times with the alternative hypothesis being that the new therapy has higher median survival. If this trial were evaluated using the traditional null hypothesis significance testing, a p-value would be produced using some predefined methodology. Small values of the p-value indicate that there is evidence that the new therapy does help patients live longer. If not, the trial would conclude that there is a failure to show such a difference, which could be due to a number of reasons.
+
+Inferential techniques typically produce some type of probabilistic output, such as a p-value, confidence interval, or posterior probability. There tends to be a delayed feedback loop in understanding how well the data matches the assumptions. In the clinical trial example, if statistical significance indicate that the new therapy should be available for patients to use, it still may be years before it is used in the field and enough data are generated for an independent assessment of whether the original statistical analysis led to the appropriate decision.
+
+#### Predictive models
+
+They model data to produce the most accurate prediction possible for new data. The primary goal is that the predicted values have the highest possible fidelity to the true value of the new data. A simple example would be for a book buyer to predict how many copies of a particular book should be shipped to their store for the next month. For this type of model, the problem type is one of estimation rather than inference. 
+
+### 1.2 Terminology
+
+Many models can be categorised as being supervised or unsupervised. Unsupervised models are those that learn patterns, clusters or other characteristics of the data but lack an outcome variable. PCA, cluster or autoencoders are examples of unsupervised models.They are used to understand relationships between variables or sets of variables without an explicit relationship between variables and an outcome. Supervised models are those that have an outcome variable. Within supervised models, there are two main sub-categories: Regression predicts a numeric outcome. Classification predicts an outcome that it is an ordered or unordered set of qualitative values.
+
+The modeling workflow usually starts with Exploratory Data Analysis (EDA), then continues with initial feature engineering, initial models and model tuning, model evaluation, more feature engineering, refined models and model tuning, and lastly, final model evaluation. 
+
+EDA consists of numerical analysis and visualization where different discoveries lead to more questions and "side-quests" to gain more understanding.
+
+Feature engineering contains specific model terms that make easier to accurately model the observed data. This can include complex methodologies such as PCA, or simple features (using the ratio of two predictors).
+
+Model tuning and selection: some models require parameter tuning where some structural parameters are required to be specific or optimized.
+
+Model evaluation: Assess the model's performance metrics, examine residual plots and conduct other EDA-like analyses to understand how well the models work.
+
+Refer to the table of cases used in <https://www.tmwr.org/software-modeling.html#predictive-models>
+
+
+
+
+
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
