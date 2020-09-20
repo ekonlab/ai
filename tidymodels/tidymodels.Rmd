@@ -47,24 +47,85 @@ Model evaluation: Assess the model's performance metrics, examine residual plots
 
 Refer to the table of cases used in <https://www.tmwr.org/software-modeling.html#predictive-models>
 
+Chapters 2 and 3 not covered here.
 
-
-
-
+## 4. Ames housing data
 
 
 ```{r}
+library(modeldata)
+library(ggplot2)
+library(tidyverse)
+data(ames)
+dim(ames)
+
+# Exploring variables
+ggplot(ames,aes(Sale_Price)) + geom_histogram(bins=50)
+
+ggplot(ames,aes(Sale_Price)) + geom_histogram(bins=50) + scale_x_log10()
+
+# Transform sale price into log
+ames = ames %>%
+  mutate(Sale_Price = log10(Sale_Price))
+
+```
+
+## 5. Spending our data
+
+The idea of data spending is an important first consideration hwen modeling, especially as it relates to empirical validation. When there are copious amounts of data available, a smart strategy is to allocate specific subsets of data for different tasks, as opposed to allocating the largest possible amount to the model parameter estimation only. 
+
+### 5.1 Common methods for splitting data
+
+The primary approach for empirical model validation is to split the existing pool of data into two distinct sets. Some observations are used to develop and optimize the model. This training set is usually the majority of the data. These data are a sandbox for model building where different models can be fit, feature engineering strategies are investigated. The other portion of the observations are placed into the test set. This is held in reserve until one or two models are chosen as the methods that are mostly likely to succeed. The test set is then used as the final arbiter to determine the efficacy of the model. It is critical to only look at the test set once, otherwise it becomes part of the modeling process.
+
+```{r}
+library(rsample)
+
+# set random seed
+set.seed(123)
+
+# split train / test
+ames_split = initial_split(ames,prob=0.80)
+ames_split
 
 ```
 
 
+```{r}
+ames_train = training(ames_split)
+ames_test = testing(ames_split)
+dim(ames_train)
+```
+When splitting randomly, we might find class imbalance, one class occurs much less frequently than another. To avoid this, stratified sampling can be used. The train/test is conducted separately within each class and then subsamples are combined into the overall training and test set. For regression problems, the outcome data can be artificially binned into quartiles and then stratified sampling conducted four separate times.This is an effective method for keeping the distributions of the outcome similar between training and test set.
 
 
+```{r}
+set.seed(123)
+ames_split = initial_split(ames,prob=0.8,strata=Sale_Price)
+ames_train = training(ames_split)
+ames_test = testing(ames_split)
+dim(ames_train)
+
+```
 
 
+### 5.2 What proportion should be used?
 
+The amount of data that should be allocated when splitting the data is highly dependent on the context of the problem at hand. Too much data in the training set lowers the quality of the performance estimates. Conversely, too much data in the test set handicaps the model's ability to find appropriate parameter estimates.Test set should be avoided only when the data are pathologically small. 
 
+### 5.3 What about a validation set?
 
+How can we tell what is best if we don't measure performance until the test set?. It is common to hear about validation sets as an answer to this question, especially in the neural network and deep learning literature. The validation set was originally defined in the early days of neural networks when researchers realized that measuring performance by re-predicting the training set samples led to results that were overly optimistic. This led to models that overfit, models that performed very well on the training set but poorly in the test set. To combat this issue, a small validation set of data were held back and used to measure performance as the network was trained. Once the validation set error rate began to rise, the training would be halted. The validation set was a means to get a rough sense of how well the model performed prior to the test set.
+
+### 5.4 Multi-level data
+
+With the Ames housing data, a property is considered to be the independent experimental unit. It is safe to assume  that, statistically, the data from a property are independent. For other applications, that is not always the case.
+
+- For longitudinal data, the same independent experimental unit can be measured over multiple time points. An example would be a human subject in a medical trial.
+
+- A batch of manufactured product might also be considered the independent experimental unit. In repeated measures designs, replicate data points from a batch are collected.
+
+In these situations, the data set will have multiple rows per experimental unit. Simple resampling across rows would lead to some data within an experimental unit being in the training set and others in the test set. Data splitting should occur at the independent experimental unit level of the data. For example, to produce an 80/20 split of the data, 80% of the experimental units should be allocated for the training set.
 
 
 
