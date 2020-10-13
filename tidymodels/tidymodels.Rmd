@@ -127,6 +127,216 @@ With the Ames housing data, a property is considered to be the independent exper
 
 In these situations, the data set will have multiple rows per experimental unit. Simple resampling across rows would lead to some data within an experimental unit being in the training set and others in the test set. Data splitting should occur at the independent experimental unit level of the data. For example, to produce an 80/20 split of the data, 80% of the experimental units should be allocated for the training set.
 
+## 6. Feature engineering with recipes
+
+Feature engineering encompasses activities that reformat predictor values to make them easier for a model to use effectively. This includes transformations and encodings of the data to best represent their important characteristics. Imagine that you have two predictors in a data set that can be more effectively represented in your model of interest as a ratio; creating a new predictor from the ratio of the original two is a simple example of feature engineering.
+
+Take the location of a house in Ames as a more involved example. There are a variety of ways that this spatial information can be exposed to a model, including neighborhood (a qualitative measure), longitude/latitude, distance to the nearest school or Iowa State University, and so on.
+
+Feature engineering and data preprocessing can also involve reformatting required by the model. Some models use geometric distance metrics and, consequently, numeric predictors should be centered and scaled so that they are all in the same units.
+
+### 6.1 A simple recipe for the Ames housing data
+
+
+In this section, we will focus on a small subset of the predictors available in the Ames housing data:
+
+- The neighborhood (qualitative, with 29 neighborhoods in the training set)
+
+- The general living area (continuous, named Gr_Liv_Area)
+
+- The year built (Year_Built)
+
+- The type of building (Bldg_Type with values OneFam (n=1,814), TwoFmCon (n=45), Duplex (n=76), Twnhs (n=76), and TwnhsE (n=188))
+
+
+
+```{r}
+library(tidymodels) # Includes the recipes package
+
+simple_ames <- 
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type,
+         data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>% 
+  step_dummy(all_nominal())
+simple_ames
+```
+
+
+### 6.2 Using recipes
+
+When invoking the recipe() function, the steps are not estimated or executed in any way. The second phase for using a recipe is to estimate any quantities required by the steps using the prep() function. For example, we can use step_normalize() to center and scale any predictors selected in the step. When we call prep(recipe, training), this function estimates the required means and standard deviations from the data in the training argument. The transformations specified by each step are also sequentially executed on the data set. Again using normalization as the example, the means and variances are estimated and then used to standardize the columns.
+
+
+```{r}
+simple_ames <- prep(simple_ames, training = ames_train)
+simple_ames
+```
+
+The third phase of recipe usage is to apply the preprocessing operations to a data set using the bake() function. The bake() function can apply the recipe to any data set. To use the test set, the syntax would be:
+
+
+```{r}
+test_ex <- bake(simple_ames, new_data = ames_test)
+names(test_ex) %>% head()
+```
+
+The bake() function can also take selectors so that, if we only wanted the neighborhood results, we could use:
+
+```{r}
+bake(simple_ames, ames_test, starts_with("Neighborhood_"))
+```
+
+Using a recipe there is a three phase process:
+recipe(): defines the pre-processing
+prep(): calculates statistics form the training set
+bake(): applies the preprocessing to data sets
+
+
+### 6.3 Encoding qualitative data in a numeric format
+
+One of the most common feature engineering tasks is transforming nominal or qualitative data (factors or characters) so that they can be encoded or represented numerically. Sometimes we can alter the factor levels of a qualitative column in helpful ways prior to such a transformation. For example, step_unknown() can be used to change missing values to a dedicated factor level. Similarly, if we anticipate that a new factor level may be encountered in future data, step_novel() can allot a new level for this purpose.
+
+Additionally, step_other() can be used to analyze the frequencies of the factor levels in the training set and convert infrequently occurring values to a catch-all level of “other”, with a specific threshold that can be specified.
+
+```{r}
+ggplot(ames_train, aes(y = Neighborhood)) + 
+  geom_bar() + 
+  labs(y = NULL)
+```
+
+Here there are two neighborhoods that have less than five properties in the training data; in this case, no houses at all in the Landmark neighborhood were included in the training set. For some models, it may be problematic to have dummy variables with a single non-zero entry in the column. At a minimum, it is highly improbable that these features would be important to a model. If we add step_other(Neighborhood, threshold = 0.01) to our recipe, the bottom 1% of the neighborhoods will be lumped into a new level called “other”. In this training set, this will catch 9 neighborhoods.
+
+
+```{r}
+simple_ames <- 
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type,
+         data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>% 
+  step_other(Neighborhood, threshold = 0.01) %>% 
+  step_dummy(all_nominal())
+```
+
+
+There are a few strategies for converting a factor predictor to a numeric format. The most common method is to create “dummy” or indicator variables.
+
+Another method that is useful when there are a large number of categories is called effect or likelihood encodings. This method replaces the original data with a single numeric column that measures the effect of those data. For example, for the neighborhood predictor, the mean sale price is computed for each neighborhood and these means are substituted for the original data values. This can be effective but should be used with care. 
+
+
+### 6.4 Interaction terms
+
+Interaction effects involve two or more predictors. Such an effect occurs when one predictor has an effect on the outcome that is contingent on one or more other predictors.
+For example, if you were trying to predict your morning commute time, two potential predictors could be the amount of traffic and the time of day. However, the relationship between commute time and the amount of traffic is different for different times of day. In this case, you could add an interaction term between the two predictors to the model along with the original two predictors (which are called the “main effects”). Numerically, an interaction term between predictors is encoded as their product. 
+
+Interactions are only defined in terms of their effect on the outcome and can be combinations of different types of data (e.g., numeric, categorical, etc).
+
+After exploring the Ames training set, we might find that the regression slopes for the general living area differ for different building types:
+
+```{r}
+ggplot(ames_train, aes(x = Gr_Liv_Area, y = 10^Sale_Price)) + 
+  geom_point(alpha = .2) + 
+  facet_wrap(~ Bldg_Type) + 
+  geom_smooth(method = lm, formula = y ~ x, se = FALSE, col = "red") + 
+  scale_x_log10() + 
+  scale_y_log10() + 
+  labs(x = "General Living Area", y = "Sale Price (USD)")
+```
+
+How are interactions specified in a recipe?
+
+```{r}
+Sale_Price ~ Neighborhood + log10(Gr_Liv_Area) + Bldg_Type + log10(Gr_Liv_Area):Bldg_Type
+# or
+Sale_Price ~ Neighborhood + log10(Gr_Liv_Area) * Bldg_Type 
+```
+
+where * expands those columns to the main effects and interaction term. Again, the formula method does many things simultaneously and understands that a factor variable (such as Bldg_Type) should be expanded into dummy variables first and that the interaction should involve all of the resulting binary columns
+
+Recipes are more explicit and sequential, and give you more control. With the current recipe, step_dummy() has already created dummy variables. How would we combine these for an interaction? The additional step would look like step_interact(~ interaction terms) where the terms on the right-hand side of the tilde are the interactions. These can include selectors, so it would be appropriate to use:
+
+```{r}
+simple_ames <- 
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type,
+         data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>% 
+  step_other(Neighborhood, threshold = 0.01) %>% 
+  step_dummy(all_nominal()) %>% 
+  # Gr_Liv_Area is on the log scale from a previous step
+  step_interact( ~ Gr_Liv_Area:starts_with("Bldg_Type_") )
+```
+
+
+### 6.6 Other examples of recipe steps
+
+#### Spline functions
+
+When a predictor has a nonlinear relationship with the outcome, some types of predictive models can adaptively approximate this relationship during training. However, simpler is usually better and it is not uncommon to try to use a simple model, such as a linear fit, and add in specific non-linear features for predictors that may need them. One common method for doing this is to use spline functions to represent the data. Splines replace the existing numeric predictor with a set of columns that allow a model to emulate a flexible, non-linear relationship.
+
+
+```{r}
+library(patchwork)
+library(splines)
+
+plot_smoother <- function(deg_free) {
+  ggplot(ames_train, aes(x = Latitude, y = Sale_Price)) + 
+    geom_point(alpha = .2) + 
+    scale_y_log10() +
+    geom_smooth(
+      method = lm,
+      formula = y ~ ns(x, df = deg_free),
+      col = "red",
+      se = FALSE
+    ) +
+    ggtitle(paste(deg_free, "Spline Terms"))
+}
+
+( plot_smoother(2) + plot_smoother(5) ) / ( plot_smoother(20) + plot_smoother(100) )
+```
+
+Some panels clearly fit poorly; two terms under-fit the data while 100 terms over-fit. The panels with five and 20 terms seem like reasonably smooth fits that catch the main patterns of the data. This indicates that the proper amount of “non-linear-ness” matters. The number of spline terms could then be considered a tuning parameter for this model.
+
+#### Feature extraction
+
+Another common method for representing multiple features at once is called feature extraction. Most of these techniques create new features from the predictors that capture the information in the broader set as a whole. For example, principal component analysis (PCA) tries to extract as much of the original information in the predictor set as possible using a smaller number of features. PCA is a linear extraction method, meaning that each new feature is a linear combination of the original predictors. One nice aspect of PCA is that each of the new features, called the principal components or PCA scores, are uncorrelated with one another.
+
+In the Ames data, there are several predictors that measure size of the property, such as the total basement size (Total_Bsmt_SF), size of the first floor (First_Flr_SF), the general living area (Gr_Liv_Area), and so on. PCA might be an option to represent these potentially redundant variables as a smaller feature set. Apart from the general living area, these predictors have the suffix SF in their names (for square feet) so a recipe step for PCA might look like:
+
+
+```{r}
+# Use a regular expression to capture house size predictors: 
+  step_pca(matches("(SF$)|(Gr_Liv)"))
+```
+
+Note that all of these columns are measured in square feet. PCA assumes that all of the predictors are on the same scale. That’s true in this case, but often this step can be preceded by step_normalize(), which will center and scale each column.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
