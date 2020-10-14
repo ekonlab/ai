@@ -308,6 +308,19 @@ In the Ames data, there are several predictors that measure size of the property
 
 Note that all of these columns are measured in square feet. PCA assumes that all of the predictors are on the same scale. That’s true in this case, but often this step can be preceded by step_normalize(), which will center and scale each column.
 
+#### Row sampling steps
+
+Recipe steps can affect the rows of a data set as well. For example, the previously mentioned subsampling technique for class imbalances will change the data being given to the model. There are several possible approaches to try:
+
+- Downsampling the data keeps the minority class and takes a random sample of the majority class so that class frequencies are balanced.
+
+- Upsampling replicates samples from the minority class to balance the classes. Some techniques do this by synthesizing new samples that resemble the minority class data while other methods simply add the same minority samples repeatedly.
+
+themis package has recipe steps that can be used for this purpose. For simple down-sampling, we would use:
+
+```{r}
+step_downsample(outcome_column_name)
+```
 
 
 
