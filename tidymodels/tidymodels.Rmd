@@ -303,7 +303,7 @@ In the Ames data, there are several predictors that measure size of the property
 
 ```{r}
 # Use a regular expression to capture house size predictors: 
-  step_pca(matches("(SF$)|(Gr_Liv)"))
+  #step_pca(matches("(SF$)|(Gr_Liv)"))
 ```
 
 Note that all of these columns are measured in square feet. PCA assumes that all of the predictors are on the same scale. That’s true in this case, but often this step can be preceded by step_normalize(), which will center and scale each column.
@@ -319,8 +319,12 @@ Recipe steps can affect the rows of a data set as well. For example, the previou
 themis package has recipe steps that can be used for this purpose. For simple down-sampling, we would use:
 
 ```{r}
-step_downsample(outcome_column_name)
+#step_downsample(outcome_column_name)
 ```
+
+
+There are other step functions that are row-based as well: step_filter(), step_sample(), step_slice(), and step_arrange(). In almost all uses of these steps, the skip argument should be set to TRUE.
+
 
 
 
