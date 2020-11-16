@@ -72,7 +72,7 @@ ames = ames %>%
 
 ## 5. Spending our data
 
-The idea of data spending is an important first consideration hwen modeling, especially as it relates to empirical validation. When there are copious amounts of data available, a smart strategy is to allocate specific subsets of data for different tasks, as opposed to allocating the largest possible amount to the model parameter estimation only. 
+The idea of data spending is an important first consideration when modeling, especially as it relates to empirical validation. When there are copious amounts of data available, a smart strategy is to allocate specific subsets of data for different tasks, as opposed to allocating the largest possible amount to the model parameter estimation only. 
 
 ### 5.1 Common methods for splitting data
 
@@ -325,11 +325,352 @@ themis package has recipe steps that can be used for this purpose. For simple do
 
 There are other step functions that are row-based as well: step_filter(), step_sample(), step_slice(), and step_arrange(). In almost all uses of these steps, the skip argument should be set to TRUE.
 
+## 7. Fitting models with parsnip
+
+The parsnip package provides a fluent and standardized interface for a variety of different models. 
+
+### 7.1. Create a model
+
+Once the data have been encoded in a format ready for a modeling algorithm, such as a numeric matrix, they can be used in the model building process.
+
+Suppose that a linear regression model was our initial choice for the model. There are a variety of methods that can be used to estimate the model parameters:
+
+- Ordinary linear regression uses the traditional method of least squares to solve for the model parameters.
+
+- Regularized linear regression adds a penalty to the least squares method to encourage simplicity by removing predictors and/or shrinking their coefficients towards zero. This can be executed using Bayesian or non-Bayesian techniques
+
+For tidymodels, the approach to specifying a model is intended to be more unified:
+
+1. Specify the type of model based on its mathematical structure (e.g., linear regression, random forest, K-nearest neighbors, etc).
+
+2. Specify the engine for fitting the model. Most often this reflects the software package that should be used.
+
+3. When required, declare the mode of the model. The mode reflects the type of prediction outcome. For numeric outcomes, the mode is regression; for qualitative outcomes, it is classification10. If a model can only create one type of model, such as linear regression, the mode is already set.
+
+Let’s walk through how to predict the sale price of houses in the Ames data as a function of only longitude and latitude.
+
+```{r}
+lm_model <- 
+  linear_reg() %>% 
+  set_engine("lm")
+
+lm_form_fit <- 
+  lm_model %>% 
+  # Recall that Sale_Price has been pre-logged
+  fit(Sale_Price ~ Longitude + Latitude, data = ames_train)
+
+lm_xy_fit <- 
+  lm_model %>% 
+  fit_xy(
+    x = ames_train %>% select(Longitude, Latitude),
+    y = ames_train %>% pull(Sale_Price)
+    )
+    
+lm_form_fit
+
+lm_xy_fit
+```
+
+Modeling functions in parsnip separate model arguments into two categories:
+
+- Main arguments are more commonly used and tend to be available across engines.
+
+- Engine arguments are either specific to a particular engine or used more rarely.
+
+For example, in the translation of the random forest code above, the arguments num.threads, verbose, and seed were added by default. These arguments are specific to the ranger implementation of random forest models and wouldn’t make sense as main arguments. Engine-specific arguments can be specified in set_engine(). For example, to have the ranger::ranger() function print out more information about the fit:
+
+```{r}
+rand_forest(trees = 1000, min_n = 5) %>% 
+  set_engine("ranger", verbose = TRUE) %>% 
+  set_mode("regression")
+```
+
+### 7.2 Use the model results
+
+Once the model is created and fit, we can use the results in a variety of ways; we might want to plot, print, or otherwise examine the model output. Several quantities are stored in a parsnip model object, including the fitted model. This can be found in an element called fit, which can be returned using the purrr::pluck() function:
+
+```{r}
+lm_form_fit %>% pluck("fit")
+```
+
+Normal methods can be applied to this object, such as printing, plotting, and so on:
+
+```{r}
+lm_form_fit %>% pluck("fit") %>% vcov()
+```
+
+One issue with some existing methods in base R is that the results are stored in a manner that may not be the most useful. For example, the summary() method for lm objects can be used to print the results of the model fit, including a table with parameter values, their uncertainty estimates, and p-values. These particular results can also be saved:
+
+```{r}
+model_res <- 
+  lm_form_fit %>% 
+  pluck("fit") %>% 
+  summary()
+
+# The model coefficient table is accessible via the `coef` method.
+param_est <- coef(model_res)
+class(param_est)
+param_est
+
+```
+
+### 7.3 Make predictions
+
+Another area where parsnip diverges from conventional R modeling functions is the format of values returned from predict(). For predictions, parsnip always conforms to the following rules:
+
+- The results are always a tibble.
+- The column names of the tibble are always predictable.
+- There are always as many rows in the tibble as there are in the input data set.
+
+```{r}
+ames_test_small <- ames_test %>% slice(1:5)
+predict(lm_form_fit, new_data = ames_test_small)
+```
+The row order of the predictions are always the same as the original data.
+
+These three rules make it easier to merge predictions with the original data:
+
+```{r}
+ames_test_small %>% 
+  select(Sale_Price) %>% 
+  bind_cols(predict(lm_form_fit, ames_test_small)) %>% 
+  # Add 95% prediction intervals to the results:
+  bind_cols(predict(lm_form_fit, ames_test_small, type = "pred_int")) 
+```
+
+The code for modeling the Ames data that we will use moving forward is:
+
+```{r}
+library(tidymodels)
+data(ames)
+ames <- mutate(ames, Sale_Price = log10(Sale_Price))
+
+set.seed(123)
+ames_split <- initial_split(ames, prob = 0.80, strata = Sale_Price)
+ames_train <- training(ames_split)
+ames_test  <-  testing(ames_split)
+
+ames_rec <- 
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type + 
+           Latitude + Longitude, data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>% 
+  step_other(Neighborhood, threshold = 0.01) %>% 
+  step_dummy(all_nominal()) %>% 
+  step_interact( ~ Gr_Liv_Area:starts_with("Bldg_Type_") ) %>% 
+  step_ns(Latitude, Longitude, deg_free = 20)
+
+lm_model <- linear_reg() %>% set_engine("lm")
+```
+
+## 8. A model workflow
+
+This chapter introduces a new object called a model workflow. The purpose of this object is to encapsulate the major pieces of the modeling process (previously discussed in Section 1.3). The workflow is important in two ways. First, using a workflow object encourages good methodology since it is a single point of entry to the estimation components of a data analysis. Second, it enables the user to better organize their projects. These two points are discussed in the following sections.
+
+### 8.2 Workflow basics
+
+The workflows package allows the user to bind modeling and preprocessing objects together. Let’s start again with the Ames data and a simple linear model:
+
+```{r}
+library(tidymodels)  # Includes the workflows package
+
+lm_model <- 
+  linear_reg() %>% 
+  set_engine("lm")
+```
+
+A workflow always requires a parsnip model object:
+
+```{r}
+lm_wflow <- 
+  workflow() %>% 
+  add_model(lm_model)
+
+lm_wflow
+```
+If our model were very simple, a standard R formula can be used as a preprocessor:
+
+```{r}
+lm_wflow <- 
+  lm_wflow %>% 
+  add_formula(Sale_Price ~ Longitude + Latitude)
+
+lm_wflow
+```
+Workflows have a fit() method that can be used to create the model. Using the objects create in Section 7.5:
+
+```{r}
+lm_fit <- fit(lm_wflow, ames_train)
+lm_fit
+```
+
+We can also predict() on the fitted workflow:
+
+```{r}
+predict(lm_fit, ames_test %>% slice(1:3))
+```
+
+Both the model and preprocessor can be removed or updated:
+
+```{r}
+lm_fit %>% update_formula(Sale_Price ~ Longitude)
+```
+
+### 8.3 Workflows and recipes
+
+Instead of using model formulas, recipe objects can also be used to preprocess data for modeling. Section 7.5 summarized a recipe that specified several preprocessing and feature engineering steps. These are encapsulated inside the object ames_rec and are attached to the workflow:
+
+```{r}
+lm_wflow <- 
+  lm_wflow %>% 
+  remove_formula() %>% 
+  add_recipe(ames_rec)
+lm_wflow
+```
+For the Ames data, the code used in later chapters is:
+
+```{r}
+library(tidymodels)
+data(ames)
+
+ames <- mutate(ames, Sale_Price = log10(Sale_Price))
+
+set.seed(123)
+ames_split <- initial_split(ames, prob = 0.80, strata = Sale_Price)
+ames_train <- training(ames_split)
+ames_test  <-  testing(ames_split)
+
+ames_rec <- 
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type + 
+           Latitude + Longitude, data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>% 
+  step_other(Neighborhood, threshold = 0.01) %>% 
+  step_dummy(all_nominal()) %>% 
+  step_interact( ~ Gr_Liv_Area:starts_with("Bldg_Type_") ) %>% 
+  step_ns(Latitude, Longitude, deg_free = 20)
+
+lm_model <- linear_reg() %>% set_engine("lm")
+
+lm_wflow <- 
+  workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(ames_rec)
+
+lm_fit <- fit(lm_wflow, ames_train)
+```
+
+## 9. Judging model effectiveness
+
+Once we have a model, we need to know how well it works. A quantitative approach for estimating effectiveness allows us to understand the model, to compare different models, or to tweak the model to improve performance. Our focus in tidymodels is on empirical validation; this usually means using data that were not used to create the model as the substrate to measure effectiveness.
+
+### 9.1. Performance metrics and inference
+
+The effectiveness of any given model depends on how the model will be used. An inferential model is used primarily to understand relationships, and typically is discussed with a strong focus on the choice (and validity) of probabilistic distributions and other generative qualities that define the model. For a model used primarily for prediction, by contrast, predictive strength is primary and concerns about underlying statistical qualities may be less important. Predictive strength is usually focused on how close our predictions come to the observed data, i.e., fidelity of the model predictions to the actual results. This chapter focuses on functions that can be used to measure predictive strength. However, our advice for those developing inferential models is to use these techniques even when the model will not be used with the primary goal of prediction.
+
+A longstanding issue with the practice of inferential statistics is that, with a focus purely on inference, it is difficult to assess the credibility of a model. For example, consider the Alzheimer’s disease data from Craig–Schapiro et al. (2011) when 333 patients were studied to determine the factors that influence cognitive impairment. An analysis might take the known risk factors and build a logistic regression model where the outcome is binary (impaired/non-impaired). Let’s consider predictors for age, sex, and the Apolipoprotein E genotype. The latter is a categorical variable with the six possible combinations of the three main variants of this gene. Apolipoprotein E is known to have an association with dementia (Jungsu, Basak, and Holtzman 2009).
+
+A superficial, but not uncommon, approach to this analysis would be to fit a large model with main effects and interactions, then use statistical tests to find the minimal set of model terms that are statistically significant at some pre-defined level. If a full model with the three factors and their two- and three-way interactions were used, an initial phase would be to test the interactions using sequential likelihood ratio tests (Hosmer and Lemeshow 2000).
+
+- When comparing the model with all two-way interactions to one with the additional three-way interaction, the likelihood ratio tests produces a p-value of 0.888. This implies that there is no evidence that the 4 additional model terms associated with the three-way interaction explain enough of the variation in the data to keep them in the model.
+
+- Next, the two-way interactions are similarly evaluated against the model with no interactions. The p-value here is 0.0382. This is somewhat borderline, but, given the small sample size, it would be prudent to conclude that there is evidence that some of the 10 possible two-way interactions are important to the model.
+
+- From here, we would build some explanation of the results. The interactions would be particularly important to discuss since they may spark interesting physiological or neurological hypotheses to be explored further.
+
+One missing piece of information in this approach is how closely this model fits the actual data. Using resampling methods, discussed in Chapter 10, we can estimate the accuracy of this model to be about 73.3%. Accuracy is often a poor measure of model performance; we use it here because it is commonly understood. If the model has 73.3% fidelity to the data, should we trust the conclusions produced by the model? We might think so until we realize that the baseline rate of non-impaired patients in the data is 72.7%. This means that, despite our statistical analysis, the two-factor model appears to be only 0.6% better than a simple heuristic that always predicts patients to be unimpaired, irregardless of the observed data.
+
+### 9.2. Regression metrics
+
+ let’s take the model from Section 8.6. The lm_wflow_fit object was a linear regression model whose predictor set was supplemented with an interaction and spline functions for longitude and latitude. It was created from a training set (named ames_train). Although we do not advise using the test set at this juncture of the modeling process, it will be used to illustrate functionality and syntax. The data frame ames_test consists of 731 properties. To start, let’s produce predictions:
+ 
+```{r}
+ames_test_res <- predict(lm_fit, new_data = ames_test %>% select(-Sale_Price))
+ames_test_res
+```
+
+The predicted numeric outcome from the regression model is named .pred. Let’s match the predicted values with their corresponding observed outcome values:
+
+```{r}
+ames_test_res <- bind_cols(ames_test_res, ames_test %>% select(Sale_Price))
+ames_test_res
+```
+
+Note that both the predicted and observed outcomes are in log10 units. It is best practice to analyze the predictions on the transformed scale (if one were used) even if the predictions are reported using the original units.
+
+```{r}
+ggplot(ames_test_res, aes(x = Sale_Price, y = .pred)) + 
+  # Create a diagonal line:
+  geom_abline(lty = 2) + 
+  geom_point(alpha = 0.5) + 
+  labs(y = "Predicted Sale Price (log10)", x = "Sale Price (log10)") +
+  # Scale and size the x- and y-axis uniformly:
+  coord_obs_pred()
+```
+
+There is one property that is substantially over-predicted.
+
+Let’s compute the root mean squared error for this model using the rmse() function:
+
+```{r}
+rmse(ames_test_res, truth = Sale_Price, estimate = .pred)
+```
+To compute multiple metrics at once, we can create a metric set. Let’s add  R2 and the mean absolute error:
+
+```{r}
+ames_metrics <- metric_set(rmse, rsq, mae)
+ames_metrics(ames_test_res, truth = Sale_Price, estimate = .pred)
+```
+
+### 9.3. Binary classification metrics
+
+```{r}
+data(two_class_example)
+str(two_class_example)
+```
+
+The second and third columns are the predicted class probabilities for the test set while predicted are the discrete predictions.
+
+For the hard class predictions, there are a variety of yardstick functions that are helpful:
+
+```{r}
+# A confusion matrix: 
+conf_mat(two_class_example, truth = truth, estimate = predicted)
+
+accuracy(two_class_example, truth = truth, estimate = predicted)
+
+# Matthews correlation coefficient:
+mcc(two_class_example, truth, predicted)
+
+# F1 metric:
+f_meas(two_class_example, truth, predicted)
+```
+
+For binary classification data sets, these functions have a standard argument called event_level. The default is that the first level of the outcome factor is the event of interest.
+
+There are numerous classification metrics that use the predicted probabilities as inputs rather than the hard class predictions. For example, the receiver operating characteristic (ROC) curve computes the sensitivity and specificity over a continuum of different event thresholds. The predicted class column is not used. There are two yardstick functions for this method: roc_curve() computes the data points that make up the ROC curve and roc_auc() computes the area under the curve.
 
 
+```{r}
+two_class_curve <- roc_curve(two_class_example, truth, Class1)
+two_class_curve
+roc_auc(two_class_example, truth, Class1)
+```
 
+The two_class_curve object can be used in a ggplot call to visualize the curve. There is an autoplot() method that will take care of the details:
 
+```{r}
+autoplot(two_class_curve)
+```
 
+### 9.4. Multi-class classification metrics
+
+```{r}
+data(hpc_cv)
+str(hpc_cv)
+```
+```{r}
+accuracy(hpc_cv, obs, pred)
+mcc(hpc_cv, obs, pred)
+```
 
 
 
