@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ## 1. Introduction
 
 Tidymodels: <https://www.tmwr.org/>.
+control + option + I for generating r chunks in rmarkdown.
 
 Models are mathematical tools that can describe a system and capture relationships in the data given to them. The utility of a model hinges on its ability to be reductive.
 
@@ -849,6 +850,162 @@ map_dfr(time_slices$splits, ~   analysis(.x) %>% data_range())
 ```{r}
 map_dfr(time_slices$splits, ~ assessment(.x) %>% data_range())
 ```
+
+## 11. Comparing models with resampling
+
+Once we create two or more models, the next step is to compare them. In some cases, comparisons might be within-model, where the same model might be evaluated with different features or pre-processing methods. Alternatively, between-model comparisons, such as when we compared linear regression and random forest models in Chapter 10, are the more common scenario.
+
+In either case, the result is a collection of resampled summary statistics (e.g. RMSE, accuracy, etc.) for each model. The first section of this chapter discusses important aspects of these statistics. Two additional sections follow describing how to formally compare models.
+
+### 11.1 Resampled performance statistics
+
+In Chapter 10, a random forest model for the Ames data was resampled with 10-fold cross-validation. These results were saved in the object rf_res. See Section 10.6 for a summary of the code used so far.
+
+We’ll estimate two additional models with the same resamples. First, the previous linear regression model, using the pre-processing defined in the ames_rec recipe, is resampled:
+
+```{r}
+keep_pred <- control_resamples(save_pred = TRUE)
+
+lm_with_splines_res <-
+  lm_wflow %>%
+  fit_resamples(resamples = ames_folds, control = keep_pred)
+```
+
+
+Secondly, a less complex recipe without the splines terms is evaluated to determine if the extra 40 spline terms are worth keeping. Once added to a workflow, it is resampled:
+
+```{r}
+lm_with_splines_res <-
+  lm_wflow %>%
+  fit_resamples(resamples = ames_folds, control = keep_pred)
+
+no_spline_rec <- 
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type + 
+           Latitude + Longitude, data = ames_train) %>%
+  # Recall that Sale_Price is pre-logged
+  step_log(Gr_Liv_Area, base = 10) %>% 
+  step_other(Neighborhood, threshold = 0.01) %>% 
+  step_dummy(all_nominal()) %>% 
+  step_interact( ~ Gr_Liv_Area:starts_with("Bldg_Type_") ) 
+
+lm_no_splines_res <- 
+  lm_wflow %>%
+  remove_recipe() %>% 
+  add_recipe(no_spline_rec) %>% 
+  fit_resamples(resamples = ames_folds, control = keep_pred)
+
+```
+
+The difference in performance appears relatively minor:
+
+```{r}
+collect_metrics(lm_no_splines_res)
+```
+```{r}
+collect_metrics(lm_with_splines_res)
+```
+
+Considering these results, it appears that the additional terms do not profoundly improve the mean RMSE or R2 statistics. The difference is small, but it might be larger than the experimental noise in the system, i.e., considered statistically significant. We can formally test the hypothesis that the additional terms increase R2.
+
+In other words, there are some resamples where performance across models tends to be low and others where it tends to be high. In statistics, this is called a resample-to-resample component of variation.
+
+To illustrate, let’s gather the individual resampling statistics for the two linear models and the random forest. We will focus on the R2 statistic for each model, which measures correlation.
+
+```{r}
+# This should be in tchapter 10.....
+rf_res <- 
+  rf_wflow %>% 
+  fit_resamples(resamples = ames_folds, control = keep_pred)
+```
+
+```{r}
+library(corrr)
+```
+
+
+
+```{r}
+no_splines_rsq <- 
+  collect_metrics(lm_no_splines_res, summarize = FALSE) %>% 
+  filter(.metric == "rsq") %>% 
+  select(id, `no splines` = .estimate)
+
+splines_rsq <- 
+  collect_metrics(lm_with_splines_res, summarize = FALSE) %>% 
+  filter(.metric == "rsq") %>% 
+  select(id, `with splines` = .estimate)
+
+rf_rsq <- 
+  collect_metrics(rf_res, summarize = FALSE) %>% 
+  filter(.metric == "rsq") %>% 
+  select(id, `random forest` = .estimate)  
+
+rsq_estimates <- 
+  inner_join(no_splines_rsq, splines_rsq, by = "id") %>% 
+  inner_join(rf_rsq, by = "id") 
+
+corrr::correlate(rsq_estimates %>% select(-id))
+
+```
+
+These high correlations indicate that, across models, there are large within-resample correlations. To see this visually, the R2 statistics are shown for each model with lines connecting the resamples:
+
+
+```{r}
+rsq_estimates %>% 
+  pivot_longer(cols = c(-id), names_to = "model", values_to = "rsq") %>% 
+  mutate(model = reorder(model, rsq)) %>% 
+  ggplot(aes(x = model, y = rsq, group = id, col = id)) + 
+  geom_line(alpha = .5, lwd = 1.25) + 
+  theme(legend.position = "none") + 
+  labs(x = NULL, y = expression(paste(R^2, "statistics")))
+```
+
+If the resample-to-resample effect was not real, there would not be any parallel lines. A statistical test for the correlations evaluates whether the magnitudes of these correlations are not simply noise. For the linear models:
+
+```{r}
+rsq_estimates %>% 
+  with( cor.test(`no splines`, `random forest`) ) %>% 
+  tidy() %>% 
+  select(estimate, starts_with("conf"))
+```
+The within-resample correlation appears to be real.
+
+### 11.2 Simple hypothesis testing methods
+
+A simple and fast method for comparing two models at a time is to use the differences in R2 values as the outcome data in the ANOVA model. Since the outcomes are matched by resample, the differences do not contain the resample-to-resample effect and, for this reason, the standard ANOVA model is appropriate. To illustrate, this call to lm() tests the difference between the two linear regression models:
+
+
+```{r}
+compare_lm <- 
+  rsq_estimates %>% 
+  mutate(difference = `with splines` - `no splines`)
+
+lm(difference ~ 1, data = compare_lm) %>% 
+  tidy(conf.int = TRUE) %>% 
+  select(estimate, p.value, starts_with("conf"))
+```
+```{r}
+# Alternatively, a paired t-test could also be used: 
+rsq_estimates %>% 
+  with( t.test(`with splines`, `no splines`, paired = TRUE) ) %>%
+  tidy() %>% 
+  select(estimate, p.value, starts_with("conf"))
+```
+
+We could evaluate each pair-wise difference in this way. Note that the p-value indicates a statistically significant signal; the collection of spline terms for longitude and latitude do appear to have an effect. However, the difference in R2 is estimated at 0.59%. If our practical effect size were 2%, we might not consider these terms worth including in the model.
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
