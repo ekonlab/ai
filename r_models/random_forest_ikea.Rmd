@@ -28,7 +28,7 @@ ikea %>%
   labs(x = NULL)
 ```
 
-Data prep for modeling
+## Data prep for modeling
 
 ```{r}
 ikea_df <- ikea %>%
@@ -38,7 +38,7 @@ ikea_df <- ikea %>%
 ```
 
 
-Build a model: We can start by loading the tidymodels metapackage, splitting our data into training and testing sets, and creating resamples.
+## Build a model: We can start by loading the tidymodels metapackage, splitting our data into training and testing sets, and creating resamples.
 
 ```{r}
 library(tidymodels)
@@ -54,8 +54,8 @@ ikea_folds
 ```
 In this analysis, we are using a function from usemodels to provide scaffolding for getting started with tidymodels tuning. The two inputs we need are:
 
-a formula to describe our model price ~ .
-our training data ikea_train
+- a formula to describe our model price ~ .
+- our training data ikea_train
 
 
 ```{r}
@@ -91,6 +91,86 @@ ranger_tune <-
     grid = 11
   )
 ```
+
+The usemodels output required us to decide for ourselves on the resamples and grid to use; it provides sensible defaults for many options based on our data but we still need to use good judgment for some modeling inputs.
+
+## Explore results
+
+Now let’s see how we did. We can check out the best-performing models in the tuning results.
+
+```{r}
+show_best(ranger_tune, metric = "rmse")
+```
+
+```{r}
+show_best(ranger_tune, metric = "rsq")
+```
+
+How did all the possible parameter combinations do?
+
+```{r}
+autoplot(ranger_tune)
+```
+
+We can finalize our random forest workflow with the best performing parameters.
+
+```{r}
+final_rf <- ranger_workflow %>%
+  finalize_workflow(select_best(ranger_tune))
+
+final_rf
+```
+
+The function last_fit() fits this finalized random forest one last time to the training data and evaluates one last time on the testing data.
+
+
+```{r}
+ikea_fit <- last_fit(final_rf, ikea_split)
+ikea_fit
+```
+
+The metrics in ikea_fit are computed using the testing data.
+
+```{r}
+collect_metrics(ikea_fit)
+```
+The predictions in ikea_fit are also for the testing data.
+
+```{r}
+collect_predictions(ikea_fit) %>%
+  ggplot(aes(price, .pred)) +
+  geom_abline(lty = 2, color = "gray50") +
+  geom_point(alpha = 0.5, color = "midnightblue") +
+  coord_fixed()
+```
+
+We can use the trained workflow from ikea_fit for prediction, or save it to use later.
+
+```{r}
+predict(ikea_fit$.workflow[[1]], ikea_test[15, ])
+```
+
+Lastly, let’s learn about feature importance for this model using the vip package. For a ranger model, we do need to go back to the model specification itself and update the engine with importance = "permutation" in order to compute feature importance. This means fitting the model one more time.
+
+```{r}
+library(vip)
+
+imp_spec <- ranger_spec %>%
+  finalize_model(select_best(ranger_tune)) %>%
+  set_engine("ranger", importance = "permutation")
+
+workflow() %>%
+  add_recipe(ranger_recipe) %>%
+  add_model(imp_spec) %>%
+  fit(ikea_train) %>%
+  pull_workflow_fit() %>%
+  vip(aesthetics = list(alpha = 0.8, fill = "midnightblue"))
+```
+
+
+
+
+
 
 
 
