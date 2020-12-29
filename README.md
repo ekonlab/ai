@@ -7,3 +7,4 @@ ML 2020
   - Salazar
   - Julia
   - Tidymodels
+  - R Models
