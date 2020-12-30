@@ -1,0 +1,49 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Airbender predictive text
+
+Our modeling goal is to predict the speaker of each line of dialogue.
+
+https://juliasilge.com/blog/last-airbender/
+
+```{r}
+library(tidyverse)
+avatar_raw <- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-08-11/avatar.csv")
+
+avatar_raw %>%
+  count(character, sort = TRUE)
+```
+
+Rows with Scene Description are not dialogue; the main character Aang speaks the most lines overall. How does this change through the three “books” of the show?
+
+
+```{r}
+library(tidytext)
+
+avatar_raw %>%
+  filter(!is.na(character_words)) %>%
+  mutate(
+    book = fct_inorder(book),
+    character = fct_lump_n(character, 10)
+  ) %>%
+  count(book, character) %>%
+  mutate(character = reorder_within(character, n, book)) %>%
+  ggplot(aes(n, character, fill = book)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~book, scales = "free") +
+  scale_y_reordered() +
+  labs(y = NULL)
+```
+
+
+
+
+
+
+
+
+
+
