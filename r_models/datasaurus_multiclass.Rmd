@@ -10,7 +10,6 @@ knitr::opts_chunk$set(echo = TRUE)
 ## datasaurus multiclass
 
 
-
 ```{r}
 library(tidyverse)
 library(datasauRus)
@@ -43,6 +42,111 @@ Let’s explore whether we can use modeling to predict which dataset a point bel
 ```{r}
 datasaurus_dozen %>%
   count(dataset)
+```
+
+## Build a model
+
+Let’s start out by creating bootstrap resamples of the Datasaurus Dozen. Notice that we aren’t splitting into testing and training sets, so we won’t have an unbiased estimate of performance on new data. Instead, we will use these resamples to understand the dataset and multiclass models better.
+
+
+```{r}
+library(tidymodels)
+
+set.seed(123)
+dino_folds <- datasaurus_dozen %>%
+  mutate(dataset = factor(dataset)) %>%
+  bootstraps()
+
+dino_folds
+```
+
+Let’s create a random forest model and set up a model workflow with the model and a formula preprocessor. We are predicting the dataset class (dino vs. circle vs. bullseye vs. …) from x and y. A random forest model can often do a good job of learning complex interactions in predictors.
+
+```{r}
+rf_spec <- rand_forest(trees = 1000) %>%
+  set_mode("classification") %>%
+  set_engine("ranger")
+
+dino_wf <- workflow() %>%
+  add_formula(dataset ~ x + y) %>%
+  add_model(rf_spec)
+
+dino_wf
+```
+
+Let’s fit the random forest model to the bootstrap resamples.
+
+```{r}
+doParallel::registerDoParallel()
+dino_rs <- fit_resamples(
+  dino_wf,
+  resamples = dino_folds,
+  control = control_resamples(save_pred = TRUE)
+)
+
+dino_rs
+```
+
+## Evaluate the model
+
+```{r}
+collect_metrics(dino_rs)
+```
+
+The accuracy is not great; a multiclass problem like this, especially one with so many classes, is harder than a binary classification problem.
+
+Since we saved the predictions with save_pred = TRUE we can compute other performance metrics. Notice that by default the positive predictive value (like accuracy) is macro-weighted for multiclass problems.
+
+
+```{r}
+dino_rs %>%
+  collect_predictions() %>%
+  group_by(id) %>%
+  ppv(dataset, .pred_class)
+```
+
+Next, let’s compute ROC curves for each class.
+
+```{r}
+dino_rs %>%
+  collect_predictions() %>%
+  group_by(id) %>%
+  roc_curve(dataset, .pred_away:.pred_x_shape) %>%
+  ggplot(aes(1 - specificity, sensitivity, color = id)) +
+  geom_abline(lty = 2, color = "gray80", size = 1.5) +
+  geom_path(show.legend = FALSE, alpha = 0.6, size = 0.5) +
+  facet_wrap(~.level, ncol = 5) +
+  coord_equal()
+```
+
+We have an ROC curve for each class and each resample in this plot. Notice that the points dataset was easy for the model to identify while the dino dataset was very difficult. The model barely did better than guessing for the dino!
+
+
+We can also compute a confusion matrix. We could use tune::conf_mat_resampled() but since there are so few examples per class and the classes were balanced, let’s just look at all the resamples together.
+
+```{r}
+dino_rs %>%
+  collect_predictions() %>%
+  conf_mat(dataset, .pred_class)
+```
+
+
+```{r}
+dino_rs %>%
+  collect_predictions() %>%
+  conf_mat(dataset, .pred_class) %>%
+  autoplot(type = "heatmap")
+```
+
+
+If we set the diagonal to all zeroes, we can see which classes were most likely to be confused for each other.
+
+```{r}
+dino_rs %>%
+  collect_predictions() %>%
+  filter(.pred_class != dataset) %>%
+  conf_mat(dataset, .pred_class) %>%
+  autoplot(type = "heatmap")
 ```
 
 
