@@ -1,0 +1,58 @@
+---
+title: "datasaurus_multiclass"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## datasaurus multiclass
+
+
+
+```{r}
+library(tidyverse)
+library(datasauRus)
+
+datasaurus_dozen
+
+```
+Plot them.
+
+```{r}
+datasaurus_dozen %>%
+  ggplot(aes(x, y, color = dataset)) +
+  geom_point(show.legend = FALSE) +
+  facet_wrap(~dataset, ncol = 5)
+```
+
+But their summary statistics are so similar.
+
+```{r}
+datasaurus_dozen %>%
+  group_by(dataset) %>%
+  summarise(across(c(x, y), list(mean = mean, sd = sd)),
+    x_y_cor = cor(x, y)
+  )
+```
+
+Let’s explore whether we can use modeling to predict which dataset a point belongs to. This is not a large dataset compared to the number of classes (13!) so this isn’t a tutorial that shows best practices for a predictive modeling workflow overall, but it does demonstrate how to evaluate a multiclass model, as well as a bit about how random forest models work.
+
+
+```{r}
+datasaurus_dozen %>%
+  count(dataset)
+```
+
+
+
+
+
+
+
+
+
+
+
+
