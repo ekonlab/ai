@@ -38,6 +38,243 @@ avatar_raw %>%
   labs(y = NULL)
 ```
 
+Let’s create a dataset for our modeling question, and look at a few example lines.
+
+```{r}
+avatar <- avatar_raw %>%
+  filter(!is.na(character_words)) %>%
+  mutate(aang = if_else(character == "Aang", "Aang", "Other")) %>%
+  select(aang, book, text = character_words)
+
+avatar %>%
+  filter(aang == "Aang") %>%
+  sample_n(10) %>%
+  pull(text)
+```
+
+What are the highest log odds words from Aang and other speakers?
+
+```{r}
+library(tidytext)
+library(tidylo)
+
+avatar_lo <- avatar %>%
+  unnest_tokens(word, text) %>%
+  count(aang, word) %>%
+  bind_log_odds(aang, word, n) %>%
+  arrange(-log_odds_weighted)
+
+avatar_lo %>%
+  group_by(aang) %>%
+  top_n(15) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, log_odds_weighted)) %>%
+  ggplot(aes(log_odds_weighted, word, fill = aang)) +
+  geom_col(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~aang, scales = "free") +
+  labs(y = NULL)
+```
+These words make sense, but the counts are probably too low to build a good model with. Instead, let’s try using text features like the number of punctuation characters, number of pronons, and so forth.
+
+```{r}
+library(textfeatures)
+
+tf <- textfeatures(
+  avatar,
+  sentiment = FALSE, word_dims = 0,
+  normalize = FALSE, verbose = FALSE
+)
+
+tf %>%
+  bind_cols(avatar) %>%
+  group_by(aang) %>%
+  summarise(across(starts_with("n_"), mean)) %>%
+  pivot_longer(starts_with("n_"), names_to = "text_feature") %>%
+  filter(value > 0.01) %>%
+  mutate(text_feature = fct_reorder(text_feature, -value)) %>%
+  ggplot(aes(aang, value, fill = aang)) +
+  geom_col(position = "dodge", alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~text_feature, scales = "free", ncol = 6) +
+  scale_fill_avatar("AirNomads") +
+  labs(x = NULL, y = "Mean text features per spoken line")
+```
+
+See more about previous countings here: https://textfeatures.mikewk.com/reference/count_functions.html
+
+## Build a model
+
+We can start by loading the tidymodels metapackage, and splitting our data into training and testing sets.
+
+```{r}
+library(tidymodels)
+
+set.seed(123)
+avatar_split <- initial_split(avatar, strata = aang)
+avatar_train <- training(avatar_split)
+avatar_test <- testing(avatar_split)
+```
+
+let’s create cross-validation resamples of the training data, to evaluate our models.
+
+```{r}
+set.seed(234)
+avatar_folds <- vfold_cv(avatar_train, strata = aang)
+avatar_folds
+```
+let’s preprocess our data to get it ready for modeling.
+
+```{r}
+library(textrecipes)
+library(themis)
+
+avatar_rec <- recipe(aang ~ text, data = avatar_train) %>%
+  step_downsample(aang) %>%
+  step_textfeature(text) %>%
+  step_zv(all_predictors()) %>%
+  step_normalize(all_predictors())
+
+avatar_prep <- prep(avatar_rec)
+avatar_prep
+```
+```{r}
+juice(avatar_prep)
+```
+
+Let’s walk through the steps in this recipe.
+
+First, we must tell the recipe() what our model is going to be (using a formula here) and what data we are using.
+Next, we downsample for our predictor, since there are many more lines spoken by characters other than Aang than by Aang.
+We create the text features using a step from the textrecipes package.
+Then we remove zero-variance variables, which includes variables like the text features about URLs and hashtags in this case.
+Finally, we center and scale the predictors because of the specific kind of model we want to try out.
+
+We’re mostly going to use this recipe in a workflow() so we don’t need to stress too much about whether to prep() or not. Since we are going to compute variable importance, we will need to come back to juice(avatar_prep).
+
+Let’s compare two different models, a random forest model and a support vector machine model. We start by creating the model specifications.
+
+
+```{r}
+rf_spec <- rand_forest(trees = 1000) %>%
+  set_engine("ranger") %>%
+  set_mode("classification")
+
+rf_spec
+```
+
+```{r}
+svm_spec <- svm_rbf(cost = 0.5) %>%
+  set_engine("kernlab") %>%
+  set_mode("classification")
+
+svm_spec
+```
+
+Next let’s start putting together a tidymodels workflow(), a helper object to help manage modeling pipelines with pieces that fit together like Lego blocks. Notice that there is no model yet: Model: None.
+
+```{r}
+avatar_wf <- workflow() %>%
+  add_recipe(avatar_rec)
+
+avatar_wf
+```
+
+Now we can add a model, and the fit to each of the resamples. First, we can fit the random forest model.
+
+```{r}
+doParallel::registerDoParallel()
+
+set.seed(1234)
+rf_rs <- avatar_wf %>%
+  add_model(rf_spec) %>%
+  fit_resamples(
+    resamples = avatar_folds,
+    metrics = metric_set(roc_auc, accuracy, sens, spec),
+    control = control_grid(save_pred = TRUE)
+  )
+```
+
+
+Second, we can fit the support vector machine model.
+
+```{r}
+set.seed(2345)
+svm_rs <- avatar_wf %>%
+  add_model(svm_spec) %>%
+  fit_resamples(
+    resamples = avatar_folds,
+    metrics = metric_set(roc_auc, accuracy, sens, spec),
+    control = control_grid(save_pred = TRUE)
+  )
+```
+We have fit each of our candidate models to our resampled training set.
+
+## Evaluate model
+
+```{r}
+collect_metrics(rf_rs)
+```
+
+```{r}
+conf_mat_resampled(rf_rs)
+```
+
+```{r}
+collect_metrics(svm_rs)
+```
+
+```{r}
+conf_mat_resampled(svm_rs)
+```
+
+Different, but not really better! The SVM model is better able to identify the positive cases but at the expense of the negative cases. Overall, we definitely see that this is a hard problem that we barely are able to have any predictive ability for.
+
+Let’s say we are more interested in detecting Aang’s lines, even at the expense of the false positives.
+
+```{r}
+svm_rs %>%
+  collect_predictions() %>%
+  group_by(id) %>%
+  roc_curve(aang, .pred_Aang) %>%
+  ggplot(aes(1 - specificity, sensitivity, color = id)) +
+  geom_abline(lty = 2, color = "black", size = 1) +
+  geom_path(show.legend = FALSE, alpha = 0.6, size = 0.5) +
+  coord_equal()
+```
+
+This plot highlights how this model is barely doing better than guessing.
+
+Keeping in mind the realities of our model performance, let’s talk about how to compute variable importance for a model like an SVM, which does not have information within it about variable importance like a linear model or a tree-based model. In this case, we can use a method like permutation of the variables.
+
+```{r}
+library(vip)
+
+set.seed(345)
+avatar_imp <- avatar_wf %>%
+  add_model(svm_spec) %>%
+  fit(avatar_train) %>%
+  pull_workflow_fit() %>%
+  vi(
+    method = "permute", nsim = 10,
+    target = "aang", metric = "auc", reference_class = "Other",
+    pred_wrapper = kernlab::predict, train = juice(avatar_prep)
+  )
+
+avatar_imp %>%
+  slice_max(Importance, n = 8) %>%
+  mutate(
+    Variable = str_remove(Variable, "textfeature_text_n_"),
+    Variable = fct_reorder(Variable, Importance)
+  ) %>%
+  ggplot(aes(Importance, Variable, color = Variable)) +
+  geom_errorbar(aes(xmin = Importance - StDev, xmax = Importance + StDev),
+    alpha = 0.5, size = 0.5
+  ) +
+  geom_point(size = 2) +
+  theme(legend.position = "none") +
+  labs(y = NULL)
+```
+
+
 
 
 
