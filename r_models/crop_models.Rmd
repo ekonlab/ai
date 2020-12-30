@@ -1,0 +1,72 @@
+---
+title: "crop_models"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Crop Yields models
+
+https://juliasilge.com/blog/crop-yields/
+
+```{r}
+library(tidyverse)
+
+key_crop_yields <- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-09-01/key_crop_yields.csv")
+land_use <- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-09-01/land_use_vs_yield_change_in_cereal_production.csv")
+```
+
+Going to use the land_use dataset only to find the top population countries. Let’s create a vector of their names.
+
+
+```{r}
+top_countries <- land_use %>%
+  janitor::clean_names() %>%
+  filter(!is.na(code), entity != "World") %>%
+  group_by(entity) %>%
+  filter(year == max(year)) %>%
+  ungroup() %>%
+  slice_max(total_population_gapminder, n = 30) %>%
+  pull(entity)
+
+top_countries
+```
+Let’s create a tidy version of the crop yields data, for the countries and crops we are interested in.
+
+```{r}
+tidy_yields <- key_crop_yields %>%
+  janitor::clean_names() %>%
+  pivot_longer(wheat_tonnes_per_hectare:bananas_tonnes_per_hectare,
+    names_to = "crop", values_to = "yield"
+  ) %>%
+  mutate(crop = str_remove(crop, "_tonnes_per_hectare")) %>%
+  filter(
+    crop %in% c("wheat", "rice", "maize", "barley"),
+    entity %in% top_countries,
+    !is.na(yield)
+  )
+
+tidy_yields
+```
+
+
+```{r}
+tidy_yields %>%
+  ggplot(aes(year, yield, color = crop)) +
+  geom_line(alpha = 0.7, size = 0.5) +
+  facet_wrap(~entity, ncol = 5) +
+  scale_x_continuous(guide = guide_axis(angle = 90)) +
+  labs(x = NULL, y = "yield (tons per hectare)")
+```
+
+
+
+
+
+
+
+
+
+
