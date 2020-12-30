@@ -62,9 +62,59 @@ tidy_yields %>%
 ```
 
 
+## Create models
+
+Now let’s fit a linear model to each country-crop combination.
+
+```{r}
+library(tidymodels)
+
+tidy_lm <- tidy_yields %>%
+  nest(yields = c(year, yield)) %>%
+  mutate(model = map(yields, ~ lm(yield ~ year, data = .x)))
+
+tidy_lm
+```
+
+Let’s tidy() those models to get out the coefficients, and adjust the p-values for multiple comparisons while we’re at it.
+
+```{r}
+slopes <- tidy_lm %>%
+  mutate(coefs = map(model, tidy)) %>%
+  unnest(coefs) %>%
+  filter(term == "year") %>%
+  mutate(p.value = p.adjust(p.value))
+
+slopes
+```
 
 
+## Explore results
 
+Now we can visualize the results of this modeling, which is estimating how crop yields are changing around the world.
+
+```{r}
+library(ggrepel)
+slopes %>%
+  ggplot(aes(estimate, p.value, label = entity)) +
+  geom_vline(
+    xintercept = 0, lty = 2,
+    size = 1.5, alpha = 0.7, color = "gray50"
+  ) +
+  geom_point(aes(color = crop), alpha = 0.8, size = 2.5, show.legend = FALSE) +
+  scale_y_log10() +
+  facet_wrap(~crop) +
+  geom_text_repel(size = 3) +
+  theme_light() +
+  theme(strip.text = element_text(size = 12)) +
+  labs(x = "increase in tons per hectare per year")
+```
+
+On the x-axis is the slope of these models. Notice that most countries are on the positive side, with increasing crop yields. The further to the right a country is, the larger the increase in crop yield over this time period. Corn yields have increased the most.
+
+On the y-axis is the p-value, a measure of how surprising the effect we see is under the assumption of no relationship (no change with time). Countries lower in the plots have smaller p-values; we are more certain those are real relationships.
+
+We can extend this to check out how well these models fit the data with glance(). This approach for using statistical models to estimate changes in many subgroups at once has been helpful.
 
 
 
