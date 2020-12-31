@@ -273,6 +273,27 @@ avatar_imp %>%
   theme(legend.position = "none") +
   labs(y = NULL)
 ```
+These are the text features that are most important globally for whether a line was spoken by Aang or not.
+
+Finally, we can return to the testing data to confirm that our performance is about the same.
+
+```{r}
+avatar_final <- avatar_wf %>%
+  add_model(svm_spec) %>%
+  last_fit(avatar_split)
+
+avatar_final %>%
+  collect_metrics()
+```
+
+```{r}
+avatar_final %>%
+  collect_predictions() %>%
+  conf_mat(aang, .pred_class)
+```
+
+
+
 
 
 
