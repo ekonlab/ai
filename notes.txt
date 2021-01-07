@@ -1,12 +1,10 @@
 repo general notes here;
 
-firefox flow: goodnotes -> drive -> notebook or notion -> github
+current flow: goodnotes -> drive -> notebook or notion -> github
 
 julia repos:
 https://github.com/JuliaAcademy/DataScience
 
 cool stuff to play with:
 https://github.com/ryansmcgee/seirsplus
-
-
 
