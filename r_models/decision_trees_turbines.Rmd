@@ -51,7 +51,7 @@ turbines_df %>%
   geom_smooth(method = "lm") +
   facet_wrap(~name, scales = "free_y") +
   labs(y = NULL) +
-  scale_fill_gradient(high = "cyan3")
+  scale_fill_gradient()
 ```
 
 ## Build a model
